@@ -5,21 +5,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST"),
-    "port": os.getenv("DB_PORT"),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASS"),
-    "dbname": os.getenv("DB_NAME"),
-}
-
 class CycleService:
 
     def __init__(self):
-        self.steps_required = int(os.getenv("ALAVANCAGEM_STEPS", 3))
+        self.steps_required = int(os.getenv("ALAVANCAGEM_STEPS"))
 
+    # -------------------------------------------------------
+    # Conexão Supabase (SSL REQUIRED)
+    # -------------------------------------------------------
     def _conn(self):
-        return psycopg2.connect(**DB_CONFIG)
+        return psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASS"),
+            dbname=os.getenv("DB_NAME"),
+            sslmode=os.getenv("DB_SSLMODE", "require")
+        )
 
     # -------------------------------------------------------
     # BUSCA CICLO ATUAL (se não tiver fechado)
@@ -44,7 +46,7 @@ class CycleService:
         return {"cycle_id": row[0], "etapa": row[1]}
 
     # -------------------------------------------------------
-    # INICIA NOVO CICLO
+    # INICIA NOVO ciclo_id
     # -------------------------------------------------------
     def start_new_cycle(self):
         conn = self._conn()
@@ -60,7 +62,7 @@ class CycleService:
         return new_cycle_id
 
     # -------------------------------------------------------
-    # SALVAR ETAPA NO BANCO
+    # SALVA ETAPA
     # -------------------------------------------------------
     def save_step(self, cycle_id, etapa, suggestion):
         conn = self._conn()
@@ -77,7 +79,7 @@ class CycleService:
             cycle_id,
             etapa,
             suggestion["fixture_id"],
-            suggestion["selections"],
+            suggestion["selections"],   # JSONB
             suggestion["odd"],
             suggestion["confidence"],
             suggestion["ev"],
@@ -89,7 +91,7 @@ class CycleService:
         conn.close()
 
     # -------------------------------------------------------
-    # REGISTRA RESULTADO DO JOGO (GREEN/RED)
+    # REGISTRA GREEN / RED
     # -------------------------------------------------------
     def register_result(self, step_id, result):
         conn = self._conn()
@@ -106,13 +108,13 @@ class CycleService:
         conn.close()
 
     # -------------------------------------------------------
-    # VERIFICA SE CICLO FECHA (3 green ou 1 red)
+    # VERIFICA STATUS DO CICLO
     # -------------------------------------------------------
     def check_cycle_status(self, cycle_id):
         conn = self._conn()
         cur = conn.cursor()
 
-        # Se tiver red → fecha
+        # Se teve 1 RED → ciclo fecha
         cur.execute("""
             SELECT COUNT(*) FROM ia_alavancagem_cycles
             WHERE cycle_id = %s AND status = 'RED';
@@ -130,7 +132,7 @@ class CycleService:
             conn.close()
             return "closed_red"
 
-        # Se tiver 3 greens → finaliza sucesso
+        # Se completou as etapas = sucesso
         cur.execute("""
             SELECT COUNT(*) FROM ia_alavancagem_cycles
             WHERE cycle_id = %s AND status = 'GREEN';

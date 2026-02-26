@@ -10,8 +10,8 @@ class AlavancagemAIService:
     def __init__(self):
         self.client = OpenAI()
         self.model = os.getenv("AI_MODEL_NAME")
-        self.odd_min = float(os.getenv("ODD_MIN", 1.45))
-        self.odd_max = float(os.getenv("ODD_MAX", 1.55))
+        self.odd_min = float(os.getenv("ODD_MIN"))
+        self.odd_max = float(os.getenv("ODD_MAX"))
 
     def build_prompt(self, dados_fixture, dados_odds, stats_home, stats_away):
         return f"""
